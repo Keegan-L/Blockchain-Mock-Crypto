@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Blockchain Wallet</title>
+    <style>
+        body {
+            background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('background.jpg');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #E3E3E3; /* Adjusted for better readability */
+        }
+    
+        h1, h2 {
+            color: #FFF; /* White color for headings */
+            padding-bottom: 10px;
+        }
+    
+        button, input[type="text"], input[type="number"] {
+            font-size: 16px;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            border: none;
+            background-color: #4A90E2;
+            color: #FFF;
+            transition: background-color 0.3s ease;
+        }
+    
+        button:hover {
+            background-color: #367CB3;
+            color: white;
+            cursor: pointer;
+            transform: scale(1.05); /* Slightly increase size on hover */
+        }
+    
+        #console, .card {
+            border: 1px solid #333;
+            background-color: #000;
+            color: #0f0;
+            padding: 10px;
+            margin-top: 20px;
+            width: 100%;
+            overflow-y: auto;
+            font-family: monospace;
+            box-shadow: 0px 0px 10px 0px rgba(0,0,0,0.75);
+        }
+    
+        .card {
+            background-color: rgba(255, 255, 255, 0.1); /* Semi-transparent white background */
+            color: #FFF; /* White text */
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+        }
+    
+        input[type="text"], input[type="number"] {
+            width: calc(50% - 22px);
+            background: rgba(255, 255, 255, 0.8); /* Light background for inputs */
+            color: #333; /* Dark text for better contrast */
+        }
+    
+        /* Custom scrollbar for console */
+        #console::-webkit-scrollbar {
+            width: 8px;
+        }
+    
+        #console::-webkit-scrollbar-thumb {
+            background-color: #4A90E2;
+            border-radius: 10px;
+        }
+    
+        #console::-webkit-scrollbar-track {
+            background: #000;
+        }
+
+        #network-visualization {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 200px;
+        height: 200px;
+        background-color: rgba(255, 255, 255, 0.2);
+        border: 1px solid #FFF;
+        border-radius: 10px;
+        padding: 10px;
+        }
+    
+    </style>
+</head>
+<body onload="getActiveNodes()">
+    <h1>Blockchain Wallet</h1>
+    <p>Current Node:</p>
+    <p>IP: {{ node_ip }}</p>  <!-- Display the node's IP address -->
+    <p>Port: {{ node_port }}</p>  <!-- Display the node's port number -->
+    <div id="network-visualization">
+        <svg id="network-svg" width="200" height="200"></svg>
+    </div>
+    <div>
+        <button onclick="getStatus()">Check Node Status</button>
+        <button onclick="getBalance()">Check Balance</button>
+        <button onclick="getActiveNodes()">View Active Nodes</button>
+        <button onclick="reconnectNode()">Reconnect to Tracker</button> 
+    </div>
+    <p id="status"></p>
+    <p id="balance"></p>
+    <p id="active-nodes"></p>
+    <form onsubmit="sendTransaction(); return false;">
+        <input type="text" id="recipient" placeholder="Recipient">
+        <input type="number" id="amount" placeholder="Amount">
+        <button type="submit">Send Transaction</button>
+    </form>
+    <p id="connect-message-reconnect"></p>
+    <p id="message"></p>
+    <form onsubmit="connectNode(); return false;">
+        <input type="text" id="address" placeholder="Node IP">
+        <input type="number" id="port" placeholder="Node Port">
+        <button type="submit">Connect Node</button>
+    </form>
+    <p id="connect-message-message"></p>
+    <form onsubmit="disconnectNode(); return false;">
+        <button type="submit">Disconnect Node</button>
+    </form>
+    <p id="disconnect-message"></p>
+    <button onclick="toggleLogging()">Toggle Logging</button> 
+    <div id="console"></div>
+    <script>
+
+    function drawNetwork(nodesCount) {
+        const svg = document.getElementById("network-svg");
+        svg.innerHTML = ''; 
+
+        const centerX = 100;
+        const centerY = 100;
+        const radius = 60;
+        const angleStep = (2 * Math.PI) / nodesCount;
+
+        const nodes = [];
+        for (let i = 0; i < nodesCount; i++) {
+            const angle = i * angleStep;
+            const x = centerX + radius * Math.cos(angle);
+            const y = centerY + radius * Math.sin(angle);
+            nodes.push({ x, y });
+        }
+
+        // Draw connections
+        for (let i = 0; i < nodesCount; i++) {
+            for (let j = i + 1; j < nodesCount; j++) {
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", nodes[i].x);
+                line.setAttribute("y1", nodes[i].y);
+                line.setAttribute("x2", nodes[j].x);
+                line.setAttribute("y2", nodes[j].y);
+                line.setAttribute("stroke", "white");
+                svg.appendChild(line);
+            }
+        }
+
+        // Draw nodes
+        for (const node of nodes) {
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", node.x);
+            circle.setAttribute("cy", node.y);
+            circle.setAttribute("r", 6);
+            circle.setAttribute("fill", "#4A90E2");
+            svg.appendChild(circle);
+        }
+    }
+
+
+async function getStatus() {
+    const response = await fetch('/status');
+    const data = await response.json();
+    document.getElementById('status').innerText = `Node Status: ${data.active ? 'Connected' : 'Disconnected'}`;
+}
+
+async function reconnectNode() {
+    const response = await fetch('/reconnect_node', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+    const data = await response.json();
+    if (response.ok) {
+        document.getElementById('connect-message-reconnect').innerText = data.message;
+    } else {
+        document.getElementById('connect-message-reconnect').innerText = `Error: ${data.error}`;
+    }
+}
+
+async function getBalance() {
+    const response = await fetch('/balance');
+    const data = await response.json();
+    document.getElementById('balance').innerText = `Balance: ${data.balance}`;
+}
+
+async function sendTransaction() {
+    const recipient_ip = document.getElementById('recipient').value;
+    const amount = document.getElementById('amount').value;
+    const response = await fetch('/transaction', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ recipient_ip, amount })
+    });
+    const data = await response.json();
+    if (response.ok) {
+        document.getElementById('message').innerText = `Transaction sent to ${data.payee} for amount ${data.amount}`;
+        getBalance();  // Update balance
+    } else {
+        document.getElementById('message').innerText = `Error: ${data.error}`;
+    }
+}
+
+async function connectNode() {
+    const address = document.getElementById('address').value;
+    const port = document.getElementById('port').value;
+    const response = await fetch('/connect_node', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ address, port })
+    });
+    const data = await response.json();
+    if (response.ok) {
+        document.getElementById('connect-message-connectt').innerText = data.message;
+    } else {
+        document.getElementById('connect-message-connect').innerText = `Error: ${data.error}`;
+    }
+}
+
+async function disconnectNode() {
+    const response = await fetch('/disconnect', {
+        method: 'POST'
+    });
+    const data = await response.json();
+    if (response.ok) {
+        document.getElementById('disconnect-message').innerText = data.message;
+        document.getElementById('status').innerText = 'Node Status: Disconnected';
+    } else {
+        document.getElementById('disconnect-message').innerText = `Error: ${data.error}`;
+    }
+}
+
+async function fetchLogs() {
+    const response = await fetch('/logs');
+    const logs = await response.json();
+    const consoleElement = document.getElementById('console');
+    consoleElement.innerHTML = logs.join('<br>');
+    consoleElement.scrollTop = consoleElement.scrollHeight;
+}
+
+function toggleLogging() {
+    if (loggingIntervalId) {
+        clearInterval(loggingIntervalId);
+        loggingIntervalId = null;
+    } else {
+        loggingIntervalId = setInterval(fetchLogs, 1000);  // Fetch logs every 15 seconds
+    }
+}
+
+
+        async function getActiveNodes() {
+            const response = await fetch('/active_nodes');
+            const data = await response.json();
+            const nodes = data.active_nodes.map(node => `${node.IP}:${node.Port}`).join(', ');
+            document.getElementById('active-nodes').innerText = `Active Nodes: ${nodes}`;
+
+            drawNetwork(data.active_nodes.length); // Draw network visualization
+        }
+
+        
+        let loggingIntervalId; // Variable to store the interval ID for logging
+
+        async function getStatus() {
+            const response = await fetch('/status');
+            const data = await response.json();
+            document.getElementById('status').innerText = `Node Status: ${data.active ? 'Connected' : 'Disconnected'}`;
+        }
+
+        async function reconnectNode() {
+            const response = await fetch('/reconnect_node', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('connect-message-reconnect').innerText = data.message;
+            } else {
+                document.getElementById('connect-message-reconnect').innerText = `Error: ${data.error}`;
+            }
+        }
+
+
+
+        async function getBalance() {
+            const response = await fetch('/balance');
+            const data = await response.json();
+            document.getElementById('balance').innerText = `Balance: ${data.balance}`;
+        }
+
+        async function sendTransaction() {
+            const recipient_ip = document.getElementById('recipient').value;
+            const amount = document.getElementById('amount').value;
+            const response = await fetch('/transaction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ recipient_ip, amount })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('message').innerText = `Transaction sent to ${data.payee} for amount ${data.amount}`;
+                getBalance();  // Update balance
+            } else {
+                document.getElementById('message').innerText = `Error: ${data.error}`;
+            }
+        }
+
+        async function connectNode() {
+            const address = document.getElementById('address').value;
+            const port = document.getElementById('port').value;
+            const response = await fetch('/connect_node', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ address, port })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('connect-message-connectt').innerText = data.message;
+            } else {
+                document.getElementById('connect-message-connect').innerText = `Error: ${data.error}`;
+            }
+        }
+
+        async function disconnectNode() {
+            const response = await fetch('/disconnect', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('disconnect-message').innerText = data.message;
+                document.getElementById('status').innerText = 'Node Status: Disconnected';
+            } else {
+                document.getElementById('disconnect-message').innerText = `Error: ${data.error}`;
+            }
+        }
+
+        async function fetchLogs() {
+            const response = await fetch('/logs');
+            const logs = await response.json();
+            const consoleElement = document.getElementById('console');
+            consoleElement.innerHTML = logs.join('<br>');
+            consoleElement.scrollTop = consoleElement.scrollHeight;
+        }
+
+        function toggleLogging() {
+            if (loggingIntervalId) {
+                clearInterval(loggingIntervalId);
+                loggingIntervalId = null;
+            } else {
+                loggingIntervalId = setInterval(fetchLogs, 1000);  // Fetch logs every 15 seconds
+            }
+        }
+
+    </script>
+</body>
+</html>

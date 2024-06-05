@@ -1,18 +1,4 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-24ddc0f5d75046c5622901739e7c5dd533143b0c8e959d652212380cedb1ea36.svg)](https://classroom.github.com/a/-Lgd7v9y)
-# CSEE 4119 Spring 2024, Class Project
-## Team name: Project Node Navigators
-## Team members (name, GitHub username): Chimaobi Onwuka, chimaobionwuka; Akinfolarin Ogunmodede, aogunmodede; Keegan Li, Keegan-L
 
-## 
-# Blockchain-based Project: README
-
-## Overview
-This project is a blockchain-based system involving multiple nodes that communicate with a central tracker server. Each node maintains its own blockchain and can handle peer-to-peer transactions. The tracker server keeps a list of active nodes and helps facilitate communication between them.
-
-Here's a `README.md` file that explains the structure, compilation, and usage of  project:
-
-md
-# Blockchain-based Project: README
 
 ## Overview
 This project is a blockchain-based system involving multiple Flask nodes that communicate with a central tracker server. Each node maintains its own blockchain and can handle peer-to-peer transactions. The tracker server keeps a list of active nodes and helps facilitate communication between them.
